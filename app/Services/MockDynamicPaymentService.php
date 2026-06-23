@@ -31,14 +31,15 @@ class MockDynamicPaymentService implements PaymentServiceInterface
     public function createTransaction(Order $order): array
     {
         $transactionId = 'MOCK-' . strtoupper(Str::random(8)) . '-' . $order->id_order;
+        $paymentUrl = route('mock.payment.page', ['invoice' => $order->no_invoice]);
 
         return [
             'transaction_id' => $transactionId,
             'order_id'       => $order->no_invoice,
             'amount'         => $order->total_tagihan,
-            'status'         => 'PENDING',
-            'qr_code_url'    => null, // Would be populated by real gateway
-            'redirect_url'   => null, // Would be populated by real gateway
+            'status'         => self::STATUS_PENDING,
+            'qr_code_url'    => null, 
+            'redirect_url'   => $paymentUrl,
             'expired_at'     => now()->addDay()->toISOString(),
             'created_at'     => now()->toISOString(),
         ];
@@ -76,9 +77,62 @@ class MockDynamicPaymentService implements PaymentServiceInterface
      */
     public function handleCallback(array $payload): void
     {
-        \Illuminate\Support\Facades\Log::info('[MockDynamicPaymentService] Callback received (no-op)', [
-            'payload' => $payload,
-        ]);
-        // No-op: real implementation would update Order and Pembayaran records here
+        $invoice = $payload['order_id'];
+        $status = $payload['status'];
+        $transactionId = $payload['transaction_id'];
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($invoice, $status, $transactionId) {
+            $order = Order::where('no_invoice', $invoice)->lockForUpdate()->first();
+            if (!$order) return;
+
+            // Idempotency: Prevent duplicate success callback from deducting stock twice
+            if ($order->status_payment->value === \App\Enums\PaymentStatus::Lunas->value) {
+                return;
+            }
+
+            if ($status === self::STATUS_SUCCESS) {
+                $order->update([
+                    'status_payment' => \App\Enums\PaymentStatus::Lunas,
+                    'status_order' => \App\Enums\OrderStatus::Diproses,
+                ]);
+
+                // Deduct stock atomically
+                foreach ($order->orderItems as $item) {
+                    if ($item->id_varian) {
+                        \App\Models\ProdukVarian::where('id_varian', $item->id_varian)
+                            ->decrement('stok', $item->qty);
+                    } elseif ($item->id_bundle) {
+                        $bundle = \App\Models\Bundle::with('bundleItems')->find($item->id_bundle);
+                        if ($bundle) {
+                            foreach ($bundle->bundleItems as $bItem) {
+                                \App\Models\ProdukVarian::where('id_produk', $bItem->id_produk)
+                                    ->decrement('stok', $bItem->qty * $item->qty);
+                            }
+                        }
+                    }
+                }
+                app(\App\Contracts\NotificationServiceInterface::class)->sendPaymentVerified($order);
+            } elseif ($status === self::STATUS_FAILED || $status === self::STATUS_CANCELLED) {
+                $order->update([
+                    'status_payment' => \App\Enums\PaymentStatus::BelumBayar,
+                ]);
+                if ($status === self::STATUS_CANCELLED) {
+                    app(\App\Contracts\NotificationServiceInterface::class)->sendOrderCancelled($order);
+                }
+            } elseif ($status === self::STATUS_EXPIRED) {
+                $order->update([
+                    'status_payment' => \App\Enums\PaymentStatus::Expired,
+                    'status_order' => \App\Enums\OrderStatus::Batal,
+                ]);
+                app(\App\Actions\ReleaseStockAction::class)->execute($order);
+                app(\App\Contracts\NotificationServiceInterface::class)->sendOrderExpired($order);
+            }
+
+            \Illuminate\Support\Facades\Log::info('Mock Transaction Status Changed', [
+                'transaction_id' => $transactionId,
+                'status' => $status,
+                'timestamp' => now()->toISOString(),
+            ]);
+        });
     }
 }

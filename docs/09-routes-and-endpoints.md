@@ -1,35 +1,47 @@
-# 09 Routes & Endpoints
+# Routes and Endpoints
 
-## Customer Facing Routes (Guest)
+This document catalogs the application's defined routes. Note that since Ospekrite is a monolithic Laravel application using Blade, most endpoints return HTML views rather than JSON, with the exception of specific API callbacks.
 
-All routes are web routes protected by standard `web` middleware (CSRF, Sessions).
+## Public User Routes (Marketplace & Checkout)
 
-| Method | URI | Controller Action | Purpose |
-|---|---|---|---|
-| GET | `/` | `HomeController@index` | Display landing page and catalog |
-| GET | `/produk/{id}` | `ProductController@show` | Display single product detail |
-| GET | `/bundle/{id}` | `BundleController@show` | Display bundle detail |
-| GET | `/checkout` | `CheckoutController@index` | Render checkout form |
-| POST | `/checkout` | `CheckoutController@process` | Submit order, create DB transaction |
-| GET | `/order/{invoice}/pembayaran` | `PembayaranController@index` | Display static QRIS & upload form |
-| POST | `/order/{invoice}/pembayaran` | `PembayaranController@upload` | Handle proof of payment upload |
-| GET | `/order/{invoice}/pembayaran/sukses` | `PembayaranController@sukses` | Upload success page |
-| GET | `/track` | `TrackingController@index` | Display verification form (Invoice + WA) |
-| POST | `/track` | `TrackingController@cari` | Verify ownership and set secure session |
-| GET | `/track/{invoice}` | `TrackingController@show` | Display secure order timeline & details |
-| POST | `/order/{invoice}/cancel` | `TrackingController@cancel` | Handle order cancellation |
+These routes are accessible by any guest user browsing the website.
 
-## Admin Routes (Future Stage 9)
-Currently unbuilt, but will follow this structure:
+| URL | Method | Controller | Middleware | Purpose |
+|-----|--------|------------|------------|---------|
+| `/` | GET | `HomeController@index` | `web` | Displays the landing page with categories, products, and bundles. |
+| `/produk/{id}` | GET | `ProdukController@show` | `web` | Displays details of a specific product or bundle. |
+| `/cart` | GET | `CartController@index` | `web` | Displays the user's current session cart. |
+| `/cart/add` | POST | `CartController@add` | `web` | Adds an item to the session cart. |
+| `/cart/remove` | POST | `CartController@remove` | `web` | Removes an item from the session cart. |
+| `/checkout` | GET | `CheckoutController@index` | `web` | Displays the checkout form (requires cart items). |
+| `/checkout` | POST | `CheckoutController@store` | `web` | Submits the order. Initiates the DB transaction. |
 
-| Method | URI | Controller Action | Middleware |
-|---|---|---|---|
-| GET | `/admin/dashboard` | `AdminDashboardController` | `auth, role:admin|dewa` |
-| GET | `/admin/orders` | `AdminOrderController@index` | `auth, role:admin|dewa` |
-| POST | `/admin/orders/{id}/verify` | `AdminPaymentController@verify` | `auth, role:admin|dewa` |
+## User Tracking Routes (Secure)
 
-## Internal/System Commands
+These routes require the user to have placed an order and are protected by the custom Guest Tracking Guard.
 
-| Command Signature | Purpose | Scheduler |
-|---|---|---|
-| `php artisan orders:expire` | Expires unpaid orders older than 24 hours | Every 15 minutes |
+| URL | Method | Controller | Middleware | Purpose |
+|-----|--------|------------|------------|---------|
+| `/track` | GET | `TrackingController@index` | `web` | Displays the login form asking for Invoice and WhatsApp number. |
+| `/track` | POST | `TrackingController@store` | `web` | Validates credentials and injects verified status into session. |
+| `/track/{invoice}` | GET | `TrackingController@show` | `web`, `cek.invoice` | Displays the detailed status of the order. |
+| `/track/{invoice}/cancel` | POST | `TrackingController@cancel` | `web`, `cek.invoice` | Allows the user to manually cancel their order if unpaid. |
+| `/pembayaran/{invoice}` | GET | `PembayaranController@index` | `web`, `cek.invoice` | Displays the QRIS Statis upload page. |
+| `/pembayaran/{invoice}` | POST | `PembayaranController@upload` | `web`, `cek.invoice` | Processes the uploaded proof of payment image. |
+
+## System & Mock Routes
+
+These routes are used for backend system operations and gateway simulations.
+
+| URL | Method | Controller | Middleware | Purpose |
+|-----|--------|------------|------------|---------|
+| `/mock-payment/{invoice}` | GET | `MockPaymentController@page` | `web` | Simulates a Midtrans/Xendit hosted checkout UI. |
+| `/mock-payment/simulate` | POST | `MockPaymentController@simulate` | `web` | Triggers the webhook callback with SUCCESS/FAILED/EXPIRED status. |
+
+## Admin Routes (Future Implementation)
+
+Currently, there is no Admin Panel implemented. These routes will be established in future stages.
+
+| URL | Method | Controller | Middleware | Purpose |
+|-----|--------|------------|------------|---------|
+| `/admin/*` | ANY | - | `auth`, `admin` | Planned for Stage 9B/10+ (Admin Panel). |

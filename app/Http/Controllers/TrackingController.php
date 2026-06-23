@@ -110,6 +110,8 @@ class TrackingController extends Controller
             'id_order'   => $order->id_order,
         ]);
 
+        app(\App\Contracts\NotificationServiceInterface::class)->sendOrderCancelled($order);
+
         return redirect()->route('track.show', $noInvoice)
             ->with('info', 'Pesanan berhasil dibatalkan.');
     }

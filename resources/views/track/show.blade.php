@@ -160,9 +160,15 @@
                 <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f3f4f6;">
                     @if($payStatus === 'belum_bayar')
                         <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                            <a href="{{ route('pembayaran.index', $order->no_invoice) }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: var(--primary); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--primary-hover)'" onmouseout="this.style.background='var(--primary)'">
-                                <i class="bi bi-credit-card"></i> Lanjut ke Pembayaran
-                            </a>
+                            @if($order->payment_type?->value === \App\Enums\PaymentType::QrisDinamis->value)
+                                <a href="{{ route('mock.payment.page', $order->no_invoice) }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: var(--primary); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--primary-hover)'" onmouseout="this.style.background='var(--primary)'">
+                                    <i class="bi bi-credit-card"></i> Bayar Sekarang (Mock)
+                                </a>
+                            @else
+                                <a href="{{ route('pembayaran.index', $order->no_invoice) }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: var(--primary); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--primary-hover)'" onmouseout="this.style.background='var(--primary)'">
+                                    <i class="bi bi-credit-card"></i> Lanjut ke Pembayaran
+                                </a>
+                            @endif
                             @if($orderStatus === 'pending')
                                 <div x-data="{ showCancelModal: false }">
                                     <button type="button" @click="showCancelModal = true" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: #ffffff; color: #ef4444; border: 1px solid #fecaca; border-radius: 8px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='#ffffff'">

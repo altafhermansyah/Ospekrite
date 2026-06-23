@@ -22,7 +22,7 @@ class CheckoutRequest extends FormRequest
             'fakultas'        => ['required', 'string', 'in:' . $fakultasList],
             'email'           => ['nullable', 'email', 'max:255'],
             'catatan'         => ['nullable', 'string', 'max:500'],
-            'payment_type'    => ['required', 'string', 'in:qris_statis'],
+            'payment_type'    => ['required', 'string', 'in:qris_statis,qris_dinamis'],
             'idempotency_key' => ['required', 'uuid'],
         ];
     }

@@ -58,6 +58,12 @@ class CheckoutController extends Controller
             $this->cartService->clear();
 
             // STEP 10 — Redirect to payment page.
+            if ($order->payment_type->value === \App\Enums\PaymentType::QrisDinamis->value) {
+                $paymentService = app(\App\Contracts\PaymentServiceInterface::class);
+                $transaction = $paymentService->createTransaction($order);
+                return redirect($transaction['redirect_url']);
+            }
+
             return redirect()->route('pembayaran.index', $order->no_invoice)
                 ->with('success', 'Pesanan berhasil dibuat! Selesaikan pembayaranmu.');
 

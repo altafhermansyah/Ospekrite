@@ -40,6 +40,10 @@ Route::post('/track',             [TrackingController::class, 'cari'])->name('tr
 Route::get('/track/{no_invoice}', [TrackingController::class, 'show'])->name('track.show');
 Route::post('/order/{no_invoice}/cancel', [TrackingController::class, 'cancel'])->name('order.cancel');
 
+// Mock Payment Routes (Stage 9B)
+use App\Http\Controllers\MockPaymentController;
+Route::get('/mock-payment/{invoice}', [MockPaymentController::class, 'show'])->name('mock.payment.page');
+Route::post('/mock-payment/{invoice}/simulate', [MockPaymentController::class, 'simulate'])->name('mock.payment.simulate');
 
 Route::middleware(['auth', 'admin.only'])->group(function () {
     // Route Dashboard Utama

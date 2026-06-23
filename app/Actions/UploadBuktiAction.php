@@ -110,6 +110,8 @@ class UploadBuktiAction
                 'is_reupload'=> $isReupload,
             ]);
 
+            app(\App\Contracts\NotificationServiceInterface::class)->sendPaymentUploaded($order);
+
             return $pembayaran;
         });
     }

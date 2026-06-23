@@ -22,6 +22,18 @@ class AppServiceProvider extends ServiceProvider
             PaymentServiceInterface::class,
             MockDynamicPaymentService::class,
         );
+
+        $this->app->bind(
+            \App\Contracts\NotificationServiceInterface::class,
+            function ($app) {
+                $driver = config('notification.default');
+                if ($driver === 'telegram') {
+                    return new \App\Services\TelegramNotificationService();
+                }
+                
+                return new \App\Services\DummyNotificationService();
+            }
+        );
     }
 
     /**

@@ -6,6 +6,11 @@ use App\Models\Order;
 
 interface PaymentServiceInterface
 {
+    public const STATUS_PENDING = 'PENDING';
+    public const STATUS_SUCCESS = 'SUCCESS';
+    public const STATUS_FAILED = 'FAILED';
+    public const STATUS_EXPIRED = 'EXPIRED';
+    public const STATUS_CANCELLED = 'CANCELLED';
     /**
      * Create a payment transaction for the given order.
      *

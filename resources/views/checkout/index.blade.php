@@ -577,17 +577,21 @@
                                        @click.stop="selectedPayment = 'qris_statis'">
                             </div>
 
-                            {{-- QRIS Dinamis (disabled) --}}
-                            <div class="payment-option disabled" title="Fitur QRIS Dinamis (Midtrans/Xendit) akan segera tersedia">
-                                <i class="bi bi-lightning-charge payment-option-icon"></i>
+                            {{-- QRIS Dinamis (enabled for Stage 9B simulation) --}}
+                            <div class="payment-option" :class="{ 'selected': selectedPayment === 'qris_dinamis' }" @click="selectedPayment = 'qris_dinamis'">
+                                <i class="bi bi-lightning-charge payment-option-icon" style="color: #f59e0b;"></i>
                                 <div class="payment-option-info">
                                     <div class="payment-option-name">
                                         QRIS Dinamis
-                                        <span class="badge-coming-soon">Segera Hadir</span>
+                                        <span class="badge-coming-soon" style="background: var(--primary);">Simulasi</span>
                                     </div>
-                                    <div class="payment-option-desc">Bayar otomatis via Midtrans/Xendit. Stok dikurangi instan setelah pembayaran berhasil.</div>
+                                    <div class="payment-option-desc">Bayar otomatis via Mock Gateway. Stok dikurangi instan setelah pembayaran berhasil.</div>
                                 </div>
-                                <input type="radio" name="_payment_display" value="qris_dinamis" disabled>
+                                <input type="radio" 
+                                       name="_payment_display" 
+                                       value="qris_dinamis" 
+                                       :checked="selectedPayment === 'qris_dinamis'"
+                                       @click.stop="selectedPayment = 'qris_dinamis'">
                             </div>
                         </div>
 

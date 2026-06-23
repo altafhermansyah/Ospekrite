@@ -1,40 +1,43 @@
-# 11 Roadmap & Progress
+# Development Roadmap
 
-## Finished Stages
+This document tracks the historical progress of Ospekrite and charts the course for future stages.
 
-- [x] **Stage 0:** Initial setup, basic models, mock data.
-- [x] **Stage 1:** Product & bundle catalog, UI implementation.
-- [x] **Stage 2:** Session-based shopping cart drawer.
-- [x] **Stage 3:** Checkout page rendering and UI logic.
-- [x] **Stage 4:** DTOs and Form Requests validation.
-- [x] **Stage 5:** Core Transaction (`CreateOrderAction`) with row locks and idempotency.
-- [x] **Stage 6:** QRIS Statis payment flow and proof upload.
-- [x] **Stage 7:** Secure guest tracking timeline via Invoice & WhatsApp.
-- [x] **Stage 8:** Order cancellation and automated 24-hour expiration scheduler.
+## Completed Stages
 
-## Upcoming Stages
+- [x] **Stage 0**: Initialization (Laravel 11, UI template setup)
+- [x] **Stage 1**: Database schema creation (Categories, Products, Variants, Bundles)
+- [x] **Stage 2**: Data Seeding & Product/Bundle display logic
+- [x] **Stage 3**: Hybrid Session Cart implementation
+- [x] **Stage 4**: Guest Checkout form & Database Transaction logic
+- [x] **Stage 5**: Guest Tracking Portal with Invoice + WhatsApp authentication
+- [x] **Stage 6**: QRIS Statis Manual Payment & Image Upload handling
+- [x] **Stage 7**: Scheduled Cron Job for Order Expiration (`orders:expire`)
+- [x] **Stage 8A**: Manual Order Cancellation by User
+- [x] **Stage 8B**: Order Status UI polish on Tracking page
+- [x] **Stage 9A**: Payment Abstraction Contracts
+- [x] **Stage 9B**: Mock Dynamic QRIS Gateway Simulation
+- [x] **Stage 10**: Notification Abstraction & Telegram Bot Integration
 
-### Stage 9: Admin Dashboard & Verification
-- Implement login for committee members.
-- Display table of orders requiring payment verification.
-- Allow admins to mark orders as `lunas` (triggering stock deduction) or `ditolak` (triggering re-upload prompts).
+## Future Roadmap
 
-### Stage 10: Logistics & Distribution
-- Allow admins to transition orders from `lunas` -> `diproses` -> `siap_diambil`.
-- Provide a QR code scanner interface for admins to instantly mark an order as `selesai` when the student picks up their package.
+The following stages dictate the future direction of the project. Priority should follow this sequence to ensure stability before scale.
 
-### Stage 11: Dynamic Payment Integration (Optional/Future)
-- Integrate Midtrans / Xendit APIs.
-- Replace manual upload form with auto-generated Virtual Accounts and dynamic QR codes.
-- Implement webhooks to auto-verify payments.
+### Stage 11A: Security Hardening
+**Priority:** High
+**Rationale:** Before real students use the system, we must audit rate limits (ThrottleRequests), ensure all uploads are strictly validated (MIME types, max sizes), and confirm no sensitive data leaks via debug modes.
 
-### Stage 12: Notifications
-- Integrate Fonnte or equivalent WhatsApp API.
-- Send automated WhatsApp messages upon: Order Created, Payment Verified, Ready for Pickup.
+### Stage 11B: Feature Tests
+**Priority:** High
+**Rationale:** The system is becoming complex. Manual testing is no longer sufficient. We must introduce automated PHPUnit/Pest tests covering cart math, stock deduction, and webhook handling.
 
-## Production Readiness Requirements
-Before deploying to production, the following must be done:
-1. Setup **Redis** for sessions and cache to handle traffic spikes.
-2. Setup **Laravel Horizon / Queues** for background tasks (email, WA notifications).
-3. Ensure SSL/TLS is active.
-4. Optimize database indexes on `no_invoice` and `idempotency_key`.
+### Stage 11C: Race Condition and Idempotency
+**Priority:** Medium
+**Rationale:** While we have basic `lockForUpdate` and `idempotency_key` implementations, we need to harden these. We should write specific concurrent tests to physically prove our DB locks hold up under stress.
+
+### Stage 12: Production Readiness
+**Priority:** Medium
+**Rationale:** Swapping out local File cache/session for Redis. Integrating a real S3 bucket instead of local storage for uploaded payment proofs. Swapping Mock Gateway for real Midtrans/Xendit API keys.
+
+### Stage 13: UX Polish
+**Priority:** Low
+**Rationale:** Adding micro-interactions, loading spinners during checkout, and refining mobile responsiveness to ensure a premium feel for the end-user.

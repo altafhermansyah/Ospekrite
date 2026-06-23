@@ -1,65 +1,54 @@
-# 05 User Flow & UX
+# User Flow
 
-## Overview
-Ospekrite is designed to look like a premium, modern web application. It uses a clean interface with Inter typography, Bootstrap Icons, and Alpine.js for smooth micro-animations.
+The User Flow documents the journey a new student takes from arriving at the website to successfully purchasing their Ospek kit. The system is designed to be completely frictionless, removing the need for user accounts.
 
 ## Customer Journey Map
 
 ```mermaid
 journey
-    title Student Purchasing Ospek Gear
+    title Student Purchasing Flow
     section Discovery
       Visit Homepage: 5: Student
-      Browse Catalog: 4: Student
-      View Bundle Details: 5: Student
+      View Catalog: 4: Student
+      Click Bundle Detail: 5: Student
     section Selection
-      Select Size Variant: 4: Student
+      Choose Size: 4: Student
       Add to Cart: 5: Student
-      Open Cart Drawer: 5: Student
+      View Cart Popup: 4: Student
     section Checkout
       Fill Personal Info: 3: Student
-      Select Faculty: 4: Student
+      Choose QRIS: 5: Student
       Submit Order: 5: Student
-    section Post-Purchase
-      Scan QRIS: 4: Student
-      Upload Screenshot: 4: Student
-      Track Order Status: 5: Student
+    section Payment & Tracking
+      Scan QR Code: 4: Student
+      Upload Proof: 3: Student
+      View Tracking Page: 5: Student
 ```
 
-## Page by Page Breakdown
+## Screen-by-Screen Breakdown
 
 ### 1. Home (`/`)
-- **Hero Section:** Large call-to-action, welcoming the new students.
-- **Dynamic Catalog:** Grid of products and bundles fetched from the database.
-- **Interactions:** Hover effects on cards, "Add to Cart" opens a side drawer seamlessly without reloading the page.
+Displays featured merchandise and bundles. The user can see prices and quickly navigate to details.
 
-### 2. Product/Bundle Detail (`/produk/{id}` & `/bundle/{id}`)
-- **Visuals:** Large product images, clear descriptions.
-- **Selection:** Radio buttons or dropdowns for selecting variants (e.g., T-Shirt Size: S, M, L, XL).
-- **Validation:** Cannot add to cart if a variant is not selected or out of stock.
+### 2. Product/Bundle Detail (`/produk/{id}`)
+Shows descriptions, images, and a dropdown for variants (sizes). Contains the core "Add to Cart" logic which posts to the CartController and stores items in the session.
 
-### 3. Cart Drawer (Global Component)
-- **UX:** Slides in from the right edge of the screen using Alpine.js transitions.
-- **Features:** Allows adjusting quantities, removing items, and shows real-time subtotal calculations.
-- **Action:** Clicking "Lanjut ke Checkout" redirects to `/checkout`.
+### 3. Cart (`/cart`)
+A hybrid view displaying everything currently stored in the session cart. Calculates subtotals. Features a direct button to proceed to checkout.
 
 ### 4. Checkout (`/checkout`)
-- **Review:** Displays final cart items and exact total.
-- **Form:** Collects `nama_pembeli`, `nim`, `no_whatsapp` (validated via regex `^(\+62|08)[0-9]{8,12}$`), and `fakultas` (populated from config).
-- **Submission:** On submit, the button goes into a loading state to prevent double clicks.
+A single-page form where the guest user enters their snapshot data (`Nama`, `Email`, `WhatsApp`, `Prodi`). 
+- Generates a hidden `idempotency_key` via UUID to prevent double submission.
+- User selects either `qris_statis` or `qris_dinamis`.
 
-### 5. Payment (`/order/{invoice}/pembayaran`)
-- **Display:** Shows the exact nominal to transfer and the static QRIS image.
-- **Upload:** Provides a clean file input for uploading `.jpg`, `.png`, or `.pdf` proof of transfer.
-- **Success:** Redirects to a success page indicating the admin is verifying the payment.
+### 5. Payment Page (`/pembayaran/{invoice}`)
+- **If QRIS Statis**: Displays a static QR code image. Contains a file upload form for the student to upload their transfer screenshot.
+- **If QRIS Dinamis**: Silently creates a transaction in the background gateway and redirects the user to the gateway's hosted checkout page. Currently routed to our internal `MockPaymentController`.
 
-### 6. Tracking (`/track`)
-- **Guest Authentication:** Requires entering the Invoice Number AND the exact WhatsApp number used during checkout.
-- **Timeline:** Visual step-by-step progress bar (Pesanan Dibuat -> Diproses -> Siap Diambil -> Selesai).
-- **Actions:** 
-  - If `belum_bayar`: Shows "Batalkan Pesanan" and "Lanjut Pembayaran".
-  - If `ditolak`: Shows "Upload Ulang Bukti".
-
-### 7. Cancel / Expired
-- **Cancel:** Users can cancel actively pending, unpaid orders. Triggers an Alpine.js confirmation modal.
-- **Expired:** After 24 hours, the UI automatically reflects the expired state, hiding all payment buttons.
+### 6. Tracking Portal (`/track`)
+The central hub for guest users to revisit their order.
+- **Authentication**: Requires the exact `Invoice Number` and the registered `WhatsApp Number` to access. This prevents random users from guessing an invoice URL and seeing someone else's personal data.
+- **Capabilities**: 
+  - View status (Lunas, Menunggu Validasi, dll).
+  - Cancel order (if unpaid).
+  - Re-upload proof (if rejected).

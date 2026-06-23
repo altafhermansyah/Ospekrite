@@ -1,65 +1,65 @@
-# 04 Business Flow
+# Business Flow
 
-## Complete Lifecycle of an Order
+This document details the lifecycle of a user interaction within Ospekrite, from landing on the marketplace to completing an order.
 
-The business logic of Ospekrite is designed to handle high concurrency during "war ticket" scenarios (thousands of students buying gear simultaneously).
+## High-Level Flowchart
 
 ```mermaid
 flowchart TD
-    A[Browse Catalog] --> B[View Product Detail / Bundle]
-    B --> C[Add to Cart Session]
-    C --> D[Checkout Page]
-    D --> E{Submit Checkout}
+    Start([User visits Website]) --> Browse[Browse Products & Bundles]
+    Browse --> Detail[View Product Detail]
+    Detail --> AddToCart{Select Variant & Add}
+    AddToCart --> Cart[View Cart]
+    Cart --> Checkout[Fill Checkout Form]
     
-    E -->|Idempotency Check| F{Duplicate?}
-    F -->|Yes| G[Return Existing Order]
-    F -->|No| H[DB::transaction]
+    Checkout --> Submit[Submit Order]
+    Submit --> CheckType{Payment Type?}
     
-    subgraph Transaction Core
-        H --> I[lockForUpdate on Variants]
-        I --> J{Stock Available?}
-        J -->|No| K[Throw InsufficientStockException]
-        J -->|Yes| L[Calculate DB Prices]
-        L --> M[Insert Order]
-        M --> N[Insert Order Items]
-    end
+    CheckType -->|QRIS Statis| StatisFlow[Show Manual QRIS Page]
+    CheckType -->|QRIS Dinamis| DinamisFlow[Redirect to Payment Gateway]
     
-    M --> O[Generate Invoice No]
-    N --> P[Commit Transaction]
+    StatisFlow --> Upload[Upload Proof of Payment]
+    Upload --> WaitValid[Admin Validates Proof]
+    WaitValid -->|Rejected| Reupload[User Re-uploads]
+    Reupload --> WaitValid
+    WaitValid -->|Approved| Lunas[Status: Lunas]
     
-    P --> Q[Clear Cart]
-    Q --> R[Redirect to Payment Page]
+    DinamisFlow --> Gateway[Gateway Processing]
+    Gateway -->|User Pays| Webhook[Webhook Callback]
+    Webhook --> Lunas
     
-    R --> S{Upload Proof}
-    S -->|Wait| T(menunggu_validasi)
+    Gateway -->|Timeout| GatewayExp[Gateway Expired]
+    GatewayExp --> WebhookExp[Webhook Callback]
+    WebhookExp --> Expired[Status: Expired / Batal]
     
-    T --> U{Admin Verification}
-    U -->|Reject| V(ditolak)
-    V -->|Reupload| S
+    StatisFlow --> CronJob[Cron Job (24h limit)]
+    CronJob -->|Not Paid| Expired
     
-    U -->|Approve| W(lunas & pending)
-    
-    W --> X(diproses)
-    X --> Y(siap_diambil)
-    Y --> Z(selesai)
-    
-    R -.->|24 Hours Pass| EX(expired & batal)
-    R -.->|User Cancels| CA(batal)
+    Lunas --> Pack[Admin Packs Order]
+    Pack --> Siap[Status: Siap Diambil]
+    Siap --> Pickup[User Picks up Kit]
+    Pickup --> Selesai([Status: Selesai])
 ```
 
-## Rules and Edge Cases
+## Edge Cases & Error Handling
 
-### 1. Pricing Source of Truth
-Never trust session data for pricing. When `CreateOrderAction` runs, it pulls the IDs from the session but recalculates all prices directly from the locked database rows to prevent tampering.
+### 1. Concurrent Checkouts (Race Conditions)
+If two students try to checkout the last available T-Shirt size M at the exact same millisecond:
+- `CreateOrderAction` uses a database transaction.
+- It iterates through the cart items and uses `lockForUpdate()` on the `produk_varians` table.
+- The second user's request is blocked at the database level until the first transaction finishes.
+- If the first transaction takes the last stock, the second transaction evaluates the fresh stock, realizes it's insufficient, and cleanly throws an `Exception` preventing negative stock.
 
-### 2. Stock Deduction Rule
-Because Ospekrite currently uses QRIS Statis (manual upload), **stock is NOT deducted during checkout**. 
-If stock were deducted at checkout, malicious users could add everything to their cart, checkout, and never pay, essentially freezing inventory for 24 hours.
-- Stock is only officially deducted when an Admin verifies the payment and marks it as `lunas`.
-- *Future Note:* When Dynamic QRIS is implemented, stock will be deducted instantly upon successful payment callback.
+### 2. Network Timeouts (Idempotency)
+If a user's internet lags while submitting the checkout, and they impatiently press the "Submit" button 3 times:
+- The frontend generates a unique UUID `idempotency_key` upon page load.
+- All 3 POST requests carry the exact same UUID.
+- The `idempotency_key` column in the `orders` table has a `UNIQUE` database constraint.
+- The first request creates the order. The 2nd and 3rd requests fail at the database level instantly, and the application catches this gracefully, redirecting the user to the tracking page of their existing order rather than charging them thrice.
 
-### 3. Concurrency (Race Conditions)
-During checkout, `CreateOrderAction` uses `$query->lockForUpdate()`. If two students try to buy the last remaining jacket at the exact same millisecond, MySQL will force the second request to wait until the first transaction finishes. The second request will then see `stok = 0` and safely throw an `InsufficientStockException`.
-
-### 4. Double Submit (Idempotency)
-If a user has a slow connection and clicks the "Pay" button 5 times, a unique UUID (`idempotency_key`) is generated on the form render. The database enforces a UNIQUE constraint on this key. Subsequent clicks will safely return the original order instead of creating 5 identical invoices.
+### 3. Expiration Cleanup
+If a user chooses QRIS Statis, decides they don't want to buy, and closes the browser:
+- The stock remains locked (or theoretically reserved).
+- The `php artisan orders:expire` cron job runs automatically.
+- It finds orders past `expired_at` (24 hours).
+- It changes the status to `batal` and importantly, calls `ReleaseStockAction` to restore the inventory for other students to buy.

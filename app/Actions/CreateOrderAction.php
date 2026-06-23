@@ -236,6 +236,8 @@ class CreateOrderAction
                 'total'     => $totalTagihan,
             ]);
 
+            app(\App\Contracts\NotificationServiceInterface::class)->sendOrderCreated($order);
+
             return $order;
 
             // Transaction commits here. Cart is cleared by CheckoutController

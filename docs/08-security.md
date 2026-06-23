@@ -1,33 +1,27 @@
-# 08 Security Architecture
+# Security Mechanisms
 
-Security is heavily prioritized, particularly around data integrity and preventing unauthorized access to guest orders.
+Security in Ospekrite is multi-layered, protecting against unauthorized data access, race conditions, and accidental duplicate billing.
 
-## 1. Concurrency & Race Conditions (`lockForUpdate`)
-**The Threat:** If a jacket has 1 stock left, and two students click "Pay" at the exact same millisecond, standard SQL queries might read `stock=1` for both, resulting in negative stock (-1) and overselling.
-**The Fix:** Inside `CreateOrderAction`, we use MySQL row-level locking:
-```php
-ProdukVarian::where('id_varian', $id)->lockForUpdate()->first();
-```
-This forces the database to serialize identical requests. The second request waits, sees `stock=0`, and gets cleanly rejected.
+## 1. CSRF (Cross-Site Request Forgery)
+**What:** Laravel's `@csrf` token is enforced on all `POST`, `PUT`, `DELETE` requests.
+**Why:** Prevents malicious external websites from submitting fake orders or uploading fake proof of payments on behalf of a logged-in session.
 
-## 2. Double Submit Prevention (Idempotency)
-**The Threat:** Users double-clicking the checkout button, or refreshing the page mid-submission, creating multiple identical orders and skewing statistics.
-**The Fix:** The checkout form generates a unique UUID (`idempotency_key`) embedded in a hidden input. The `orders` table has a `UNIQUE` index on this column. If the same key arrives twice, Laravel catches the `DuplicateCheckoutException` and simply redirects the user to the first created invoice.
+## 2. Strict Form Validation
+**What:** `CheckoutRequest` and `TrackRequest` use strict Laravel validation rules.
+**Why:** Ensures data integrity. For example, `payment_type` is restricted to `in:qris_statis,qris_dinamis` so a user cannot inject a non-existent payment gateway.
 
-## 3. ACID Transactions (`DB::transaction`)
-**The Threat:** The system successfully inserts the `orders` row but crashes before inserting `order_item` rows, leaving a corrupted, empty invoice in the database.
-**The Fix:** All mutations happen inside `DB::transaction()`. If any exception is thrown, all queries roll back entirely.
+## 3. Idempotency Keys (Double Submit Prevention)
+**What:** A UUID generated on the frontend is sent with the checkout form. The `orders` table has a unique constraint on `idempotency_key`.
+**Why:** If a user clicks the "Submit" button multiple times due to a slow internet connection, only the first request succeeds. The subsequent requests hit a database constraint violation, which the controller catches and safely redirects the user to the already-created order tracking page.
 
-## 4. Guest Order Ownership Verification
-**The Threat:** Because there is no login, anyone could theoretically guess an invoice number (e.g., `OSP-2026-000001`) and view someone else's personal data (name, NIM, phone number).
-**The Fix:** The `/track` endpoint acts as a gatekeeper. It requires both the `no_invoice` AND the exact `no_whatsapp` used during checkout. Once verified, a secure, cryptographically signed session variable (`session('verified_invoice')`) is set, allowing access to the detail page. Without this session, accessing the URL directly bounces the user back.
+## 4. Race Condition Prevention (`lockForUpdate`)
+**What:** During checkout, when determining if enough stock is available, the code uses `DB::transaction()` and `->lockForUpdate()` on the `produk_varians` table.
+**Why:** If 5 students try to buy the last 1 available T-Shirt at the exact same millisecond, they would all see `stock = 1` in a normal query and all 5 orders would succeed, causing negative stock (`-4`). By locking the rows, the database forces them to process sequentially. The first one takes the stock, and the other 4 will read `stock = 0` and be rejected.
 
-## 5. File Upload Protection
-**The Threat:** Users uploading PHP scripts disguised as images to gain Remote Code Execution (RCE) on the server via the proof upload form.
-**The Fix:** 
-- Strict Laravel Validation: `mimes:jpg,jpeg,png,pdf|max:2048`
-- Files are stored in the non-executable `storage/app/public` directory, ensuring they cannot be executed by the PHP interpreter even if bypassed.
+## 5. DB Transactions
+**What:** `DB::transaction()` is wrapped around `CreateOrderAction` and Webhook Callbacks.
+**Why:** If creating the `order_details` fails halfway through, the entire `orders` row creation is rolled back. This prevents orphaned data and ensures atomicity.
 
-## 6. CSRF & XSS
-- **CSRF:** Every `POST` form utilizes Laravel's `@csrf` token to prevent Cross-Site Request Forgery.
-- **XSS:** All blade outputs use `{{ $variable }}` which runs PHP's `htmlspecialchars` automatically, preventing Cross-Site Scripting injections. Raw output `{!! !!}` is strictly forbidden.
+## 6. Guest Tracking Ownership Validation
+**What:** The tracking page cannot be accessed by simply visiting `/track/{invoice}`. The system uses a dedicated `GuestTrackingGuard`.
+**Why:** Because there are no user accounts, the invoice number alone is not secure enough (someone could guess `OSP-2026-000001`). By requiring the user to input their `no_wa` (WhatsApp number) that matches the database record, we create a pseudo-authentication mechanism that protects the privacy of the student's name, email, and order details.

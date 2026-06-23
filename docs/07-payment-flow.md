@@ -1,48 +1,95 @@
-# 07 Payment Flow Architecture
+# Payment & Notification Flow
 
-## Current Implementation: QRIS Statis (Manual)
+Ospekrite implements a flexible payment architecture designed to start manually and seamlessly upgrade to automated gateways in the future. Coupled with this is a robust notification abstraction system.
 
-To launch quickly without waiting for corporate legal approvals required by payment gateways, Ospekrite currently uses a manual "QRIS Statis" flow. 
+---
 
-### Sequence Diagram
+## Payment Flow
+
+### QRIS Static (Manual)
 
 ```mermaid
 sequenceDiagram
-    actor Student
-    participant Controller
-    participant DB
-    actor Admin
-
-    Student->>Controller: Visits /pembayaran
-    Controller-->>Student: Shows Static QR Code
-    Student->>Student: Scans QR with Banking App
-    Student->>Controller: Uploads Screenshot (Proof)
-    Controller->>DB: update status = menunggu_validasi, save file path
-    Controller-->>Student: Success Page
+    participant User
+    participant System
+    participant Admin
     
-    Admin->>DB: Views Pending Payments
-    alt Invalid Proof
-        Admin->>DB: update status = ditolak
-        DB-->>Student: Tracking shows "Ditolak", prompts re-upload
-        Student->>Controller: Uploads New Proof
-        Controller->>DB: Delete old file, save new file, status = menunggu_validasi
-    else Valid Proof
-        Admin->>DB: update status = lunas
-        DB-->>Student: Tracking shows "Diproses"
+    User->>System: Submit Checkout (QRIS Statis)
+    System-->>User: Redirect to Payment Page (Show QR)
+    User->>User: Scans QR with Banking App
+    User->>System: Upload Screenshot (UploadBuktiAction)
+    System->>System: status_payment = menunggu_validasi
+    System->>Admin: Notification: Bukti Uploaded
+    Admin->>System: Review Screenshot (Admin Panel)
+    alt is valid
+        System->>System: status_payment = lunas, status_order = diproses
+    else is fake
+        System->>System: status_payment = ditolak
+        System-->>User: Please Re-upload
     end
 ```
 
-## Future Implementation: Dynamic QRIS (Midtrans/Xendit)
+### QRIS Dynamic (Automated Gateway)
 
-The system is already architected to support dynamic payments. The `MockDynamicPaymentService` exists as a contract implementation to guide future developers.
+```mermaid
+sequenceDiagram
+    participant User
+    participant System
+    participant Gateway (Midtrans/Mock)
+    
+    User->>System: Submit Checkout (QRIS Dinamis)
+    System->>Gateway: createTransaction(Order)
+    Gateway-->>System: Return Redirect URL
+    System-->>User: Redirect to Gateway Page
+    User->>Gateway: Completes Payment
+    Gateway->>System: POST Webhook Callback (status: SUCCESS)
+    System->>System: Verify Signature / Idempotency
+    System->>System: Lock Rows, Deduct Stock, status = lunas
+    System-->>Gateway: 200 OK
+```
 
-### How Dynamic Payment Works
+### Payment Abstraction
 
-1. **Checkout:** User submits checkout.
-2. **API Call:** System calls Gateway (e.g., Midtrans) to generate a unique QR code or Virtual Account strictly tied to `total_tagihan`.
-3. **Display:** System displays the dynamic QR on the payment page. No upload form is shown.
-4. **Webhook:** When the user pays, the Gateway pings the Laravel Webhook endpoint asynchronously.
-5. **Auto-Update:** The webhook updates the database to `lunas` and `diproses` instantly.
+To ensure controllers don't need to change when switching providers, we use `PaymentServiceInterface`.
+Currently, `MockDynamicPaymentService` implements this to simulate the webhook flow locally. When ready for production, we simply create `MidtransPaymentService` and swap the binding in `AppServiceProvider`.
 
-### Why Not Implemented Yet?
-Implementing real Midtrans requires production API keys, corporate bank accounts, and legal documents (KTP/NPWP of the committee organization). The architecture is ready for it once the business side clears.
+---
+
+## Notification Flow
+
+Notifications to the organizing committee are strictly decoupled from the core business transaction. **Notifications must never break the business flow.** If Telegram servers are down, the student's order must still be successfully saved and processed.
+
+### Supported Providers
+- **`TelegramNotificationService`**: Uses Laravel's HTTP client (`Http::withoutVerifying()->post()`) to hit the Bot API.
+- **`DummyNotificationService`**: Fallback for local environments, simply logs the message to `laravel.log`.
+- **Future Support**: Ready for WhatsApp (Fonnte/Twilio) via the same `NotificationServiceInterface`.
+
+### Failure Handling Architecture
+
+```mermaid
+sequenceDiagram
+    participant Transaction (CreateOrderAction)
+    participant NotificationService
+    participant TelegramAPI
+    participant DB
+    
+    Transaction->>DB: DB::transaction() start
+    Transaction->>DB: Lock Variants & Insert Order
+    Transaction->>DB: DB::commit()
+    Transaction->>NotificationService: sendOrderCreated($order)
+    
+    alt Telegram API is UP
+        NotificationService->>TelegramAPI: HTTP POST
+        TelegramAPI-->>NotificationService: 200 OK
+    else Telegram API is DOWN
+        NotificationService->>TelegramAPI: HTTP POST
+        TelegramAPI--xNotificationService: Timeout / 500 Error
+        NotificationService->>NotificationService: Catch Exception
+        NotificationService->>Log: Log::error(Exception)
+    end
+    
+    NotificationService-->>Transaction: void return
+    Transaction-->>User: Redirect to Tracking (Success)
+```
+
+As demonstrated, the `try-catch` block inside the Notification Service prevents the Exception from bubbling up to the Action, thereby saving the customer from encountering a 500 Server Error just because a background notification failed to send.

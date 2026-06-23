@@ -83,6 +83,8 @@ class ExpireOrders extends Command
                     'id_order'   => $freshOrder->id_order,
                     'expired_at' => $freshOrder->expired_at->toDateTimeString(),
                 ]);
+
+                app(\App\Contracts\NotificationServiceInterface::class)->sendOrderExpired($freshOrder);
             });
         }
 
