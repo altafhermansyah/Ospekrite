@@ -104,7 +104,7 @@
                         <template x-for="(step, index) in steps" :key="step.id">
                             <div style="position: relative; padding-bottom: 24px; padding-left: 28px;">
                                 {{-- Vertical Line --}}
-                                <div x-show="index !== steps.length - 1" style="position: absolute; left: 0; top: 24px; bottom: -8px; width: 2px;" :style="isActive(steps[index+1].id) ? 'background: var(--primary);' : 'background: #e5e7eb;'"></div>
+                                <div x-show="index !== steps.length - 1" style="position: absolute; left: 0; top: 24px; bottom: -8px; width: 2px;" :style="(steps[index+1] && isActive(steps[index+1].id)) ? 'background: var(--primary);' : 'background: #e5e7eb;'"></div>
                                 
                                 {{-- Circle --}}
                                 <div style="position: absolute; left: -8px; top: 4px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center;"
@@ -156,29 +156,54 @@
             </div>
 
             {{-- Action Buttons Area --}}
-            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f3f4f6;">
-                @if($payStatus === 'belum_bayar')
-                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                        <a href="{{ route('pembayaran.index', $order->no_invoice) }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: var(--primary); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--primary-hover)'" onmouseout="this.style.background='var(--primary)'">
-                            <i class="bi bi-credit-card"></i> Lanjut ke Pembayaran
-                        </a>
-                        @if($orderStatus === 'pending')
-                            <form action="{{ route('order.cancel', $order->no_invoice) }}" method="POST" style="margin: 0;">
-                                @csrf
-                                <button type="submit" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: #ffffff; color: #ef4444; border: 1px solid #fecaca; border-radius: 8px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='#ffffff'">
-                                    <i class="bi bi-x-circle"></i> Batalkan Pesanan
-                                </button>
-                            </form>
-                        @endif
-                    </div>
-                @elseif($payStatus === 'ditolak')
-                    <div>
-                        <a href="{{ route('pembayaran.index', $order->no_invoice) }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: #ef4444; color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
-                            <i class="bi bi-upload"></i> Upload Ulang Bukti
-                        </a>
-                    </div>
-                @endif
-            </div>
+            @if($orderStatus !== 'batal')
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f3f4f6;">
+                    @if($payStatus === 'belum_bayar')
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            <a href="{{ route('pembayaran.index', $order->no_invoice) }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: var(--primary); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--primary-hover)'" onmouseout="this.style.background='var(--primary)'">
+                                <i class="bi bi-credit-card"></i> Lanjut ke Pembayaran
+                            </a>
+                            @if($orderStatus === 'pending')
+                                <div x-data="{ showCancelModal: false }">
+                                    <button type="button" @click="showCancelModal = true" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: #ffffff; color: #ef4444; border: 1px solid #fecaca; border-radius: 8px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='#ffffff'">
+                                        <i class="bi bi-x-circle"></i> Batalkan Pesanan
+                                    </button>
+
+                                    {{-- Cancel Confirmation Modal --}}
+                                    <div x-show="showCancelModal" style="display: none; position: fixed; inset: 0; z-index: 50; overflow-y: auto;" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                                        <div style="display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 16px; text-align: center;">
+                                            <div x-show="showCancelModal" x-transition.opacity style="position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.5); transition: opacity 0.3s;" aria-hidden="true" @click="showCancelModal = false"></div>
+
+                                            <div x-show="showCancelModal" x-transition style="position: relative; background-color: #fff; border-radius: 12px; padding: 24px; text-align: left; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-width: 400px; width: 100%;">
+                                                <h3 id="modal-title" style="font-size: 1.1rem; font-weight: 700; color: #111827; margin-bottom: 12px;">Konfirmasi Pembatalan</h3>
+                                                <p style="font-size: 0.9rem; color: #4b5563; margin-bottom: 24px;">Apakah kamu yakin ingin membatalkan pesanan?</p>
+                                                
+                                                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                                                    <button type="button" @click="showCancelModal = false" style="padding: 10px 16px; background: #f3f4f6; color: #4b5563; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                                                        Tutup
+                                                    </button>
+                                                    <form action="{{ route('order.cancel', $order->no_invoice) }}" method="POST" style="margin: 0;">
+                                                        @csrf
+                                                        <button type="submit" style="padding: 10px 16px; background: #ef4444; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                                                            Ya, Batalkan
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @elseif($payStatus === 'ditolak')
+                        <div>
+                            <a href="{{ route('pembayaran.index', $order->no_invoice) }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 24px; background: #ef4444; color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                                <i class="bi bi-upload"></i> Upload Ulang Bukti
+                            </a>
+                        </div>
+                    @endif
+                </div>
+            @endif
 
         </div>
 

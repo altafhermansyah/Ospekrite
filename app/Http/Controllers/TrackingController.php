@@ -76,11 +76,41 @@ class TrackingController extends Controller
 
     /**
      * POST /order/{no_invoice}/cancel
-     * Stub — do not implement in Stage 7A.
+     * Stage 8A - Order Cancellation for guest users.
      */
     public function cancel(string $noInvoice)
     {
+        if (session('verified_invoice') !== $noInvoice) {
+            return redirect()->route('track.index')
+                ->with('error', 'Silakan verifikasi pesanan terlebih dahulu.');
+        }
+
+        $order = Order::where('no_invoice', $noInvoice)->firstOrFail();
+
+        // CANCELLATION RULES
+        if ($order->status_order !== \App\Enums\OrderStatus::Pending || 
+            $order->status_payment !== \App\Enums\PaymentStatus::BelumBayar) {
+            
+            // BLOCK CANCELLATION
+            return redirect()->route('track.show', $noInvoice)
+                ->with('error', 'Pesanan tidak dapat dibatalkan.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($order) {
+            $order->update([
+                'status_order' => \App\Enums\OrderStatus::Batal->value,
+            ]);
+
+            // ReleaseStockAction would be called here if stock was previously deducted.
+            app(\App\Actions\ReleaseStockAction::class)->execute($order);
+        });
+
+        \Illuminate\Support\Facades\Log::info('Order cancelled by user', [
+            'no_invoice' => $order->no_invoice,
+            'id_order'   => $order->id_order,
+        ]);
+
         return redirect()->route('track.show', $noInvoice)
-            ->with('info', 'Fitur pembatalan belum tersedia.');
+            ->with('info', 'Pesanan berhasil dibatalkan.');
     }
 }
