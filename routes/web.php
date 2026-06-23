@@ -7,12 +7,41 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+use App\Http\Controllers\StorefrontController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\PembayaranController;
+use App\Http\Controllers\TrackingController;
+
+Route::get('/', [StorefrontController::class, 'index'])->name('home');
+Route::get('/produk/{id}', [StorefrontController::class, 'showProduk'])->name('produk.show');
+Route::get('/bundle/{id}', [StorefrontController::class, 'showBundle'])->name('bundle.show');
+
+// Cart Routes
+Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+Route::get('/cart/data', [CartController::class, 'data'])->name('cart.data');
+Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
+Route::post('/cart/update', [CartController::class, 'update'])->name('cart.update');
+Route::post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
+Route::delete('/cart/clear', [CartController::class, 'clear'])->name('cart.clear');
+
+// Checkout Routes
+Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')->middleware('throttle:5,1');
+
+// Payment Routes (Stage 6A — Static QRIS)
+Route::get('/order/{no_invoice}/pembayaran',        [PembayaranController::class, 'index'])->name('pembayaran.index');
+Route::post('/order/{no_invoice}/pembayaran',       [PembayaranController::class, 'store'])->name('pembayaran.store');
+Route::get('/order/{no_invoice}/pembayaran/sukses', [PembayaranController::class, 'sukses'])->name('pembayaran.sukses');
+
+// Order Tracking Routes (Stage 6A Stub — full implementation in Stage 7)
+Route::get('/track',              [TrackingController::class, 'index'])->name('track.index');
+Route::post('/track',             [TrackingController::class, 'cari'])->name('track.cari');
+Route::get('/track/{no_invoice}', [TrackingController::class, 'show'])->name('track.show');
+Route::post('/order/{no_invoice}/cancel', [TrackingController::class, 'cancel'])->name('order.cancel');
 
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'admin.only'])->group(function () {
     // Route Dashboard Utama
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     // Route Manajemen Produk Satuan

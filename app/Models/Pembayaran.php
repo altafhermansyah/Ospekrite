@@ -13,7 +13,12 @@ class Pembayaran extends Model
 
     protected $fillable = [
         'id_order', 'id_metode', 'nama_pengirim',
-        'bukti_transfer', 'status_pembayaran'
+        'bukti_transfer', 'status_pembayaran',
+        'waktu_bayar', 'tipe_pembayaran',
+    ];
+
+    protected $casts = [
+        'waktu_bayar' => 'datetime',
     ];
 
     public function order(): BelongsTo
