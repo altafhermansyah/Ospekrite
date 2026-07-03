@@ -1,66 +1,118 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Ospekrite
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Ospekrite is a modern, guest-checkout e-commerce marketplace built specifically to handle the ordering of university orientation (Ospek) kits. It features a frictionless purchasing flow, robust backend tracking, payment abstraction, and event-driven Telegram notifications.
 
-## About Laravel
+## Key Features
+- **Guest Checkout**: No user registration required. Authentication via Invoice Number + WhatsApp.
+- **Hybrid Cart**: Supports individual variants and predefined bundles.
+- **Stock Management**: Atomic stock deduction with database-level race condition locks.
+- **Payment Flexibility**: Supports manual QRIS uploads and simulated Dynamic Webhook gateways.
+- **Telegram Notifications**: Real-time updates pushed directly to the organizing committee's group chat.
+- **Automated Expiration**: Background cron jobs cleanly manage unpaid reservations.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 📂 Folder Structure
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```
+Ospekrite/
+├── app/
+│   ├── Actions/       # Complex business logic (CreateOrder, UploadBukti)
+│   ├── Console/       # Scheduled tasks (ExpireOrders)
+│   ├── Contracts/     # Interfaces (Notification, Payment)
+│   ├── DTOs/          # Data Transfer Objects
+│   ├── Enums/         # Strictly typed status definitions
+│   ├── Http/          # Controllers, Requests, Middleware
+│   ├── Models/        # Eloquent ORM
+│   └── Services/      # External integrations (Telegram, Mock Gateway)
+├── config/            # Custom config (notification.php, payment.php)
+├── database/          # Migrations & Seeders
+├── docs/              # 📚 Comprehensive Project Documentation
+├── resources/         # Blade views and assets
+└── routes/            # Web and API routing
+```
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 🚀 Installation & Environment Setup
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### 1. Prerequisites
+- PHP 8.2+
+- Composer
+- MySQL 8.x
+- Node.js & NPM
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 2. Installation Steps
 
-## Laravel Sponsors
+1. Clone the repository and install dependencies:
+   ```bash
+   composer install
+   npm install && npm run build
+   ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+2. Setup the environment file:
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
 
-### Premium Partners
+3. Configure your Database in `.env`:
+   ```env
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=ospekkit
+   DB_USERNAME=root
+   DB_PASSWORD=
+   ```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+4. Run Migrations and Seeders (Populates dummy products):
+   ```bash
+   php artisan migrate:fresh --seed
+   ```
 
-## Contributing
+5. Setup Storage Symlink (Required for uploaded QRIS proofs):
+   ```bash
+   php artisan storage:link
+   ```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+6. Start the local development server:
+   ```bash
+   php artisan serve
+   ```
 
-## Code of Conduct
+---
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 📱 Telegram Configuration
 
-## Security Vulnerabilities
+To receive real-time notifications when users create orders or pay, you must configure the Telegram driver. 
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. Open `.env` and add the following keys. **Never commit real tokens to version control!**
+   ```env
+   NOTIFICATION_DRIVER=telegram
+   TELEGRAM_BOT_TOKEN=your_bot_token_here
+   TELEGRAM_CHAT_ID=your_chat_id_here
+   ```
+   > **Note on Chat IDs:**
+   > Use a positive number (e.g., `123456789`) for direct messages to the bot.
+   > Use a negative number (e.g., `-100123456789`) for group chats where the bot is a member.
 
-## License
+2. Clear your configuration cache so Laravel reads the new values:
+   ```bash
+   php artisan config:clear
+   ```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+*(If you leave `NOTIFICATION_DRIVER=dummy` or empty, the application will safely log notifications to `storage/logs/laravel.log` without failing).*
+
+---
+
+## ⚠️ Important Warnings
+
+- **Local Development SSL Errors**: If you encounter `cURL error 60` locally when sending Telegram messages, it's due to local SSL certificate issues. We have implemented `Http::withoutVerifying()` in the Telegram Service specifically to bypass this locally. Do not use this in production.
+- **Cron Jobs**: To test the expiration of unpaid orders, you must manually trigger the command `php artisan orders:expire` in your local terminal. In production, this must be added to the server's crontab.
+
+---
+
+## 📖 Further Reading
+
+Please refer to the `docs/` directory for exhaustive documentation on architecture, flows, and state machines. Start with [`docs/01-overview.md`](docs/01-overview.md).

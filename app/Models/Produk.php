@@ -30,6 +30,11 @@ class Produk extends Model
         return $this->hasMany(ProdukVarian::class, 'id_produk', 'id_produk');
     }
 
+    public function produkVarian(): HasMany
+    {
+        return $this->hasMany(ProdukVarian::class, 'id_produk', 'id_produk');
+    }
+
     public function bundleItems(): HasMany
     {
         return $this->hasMany(BundleItem::class, 'id_produk', 'id_produk');
