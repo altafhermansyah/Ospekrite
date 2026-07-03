@@ -55,6 +55,7 @@ Route::middleware(['auth', 'admin.only'])->group(function () {
     Route::delete('/produk/{id}', [ProdukController::class, 'destroy'])->name('produk.destroy');
     // Route Manajemen Pesanan (Orders)
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus'])->name('orders.updateStatus');
     // Route Manajemen Pengguna (Users)
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::put('/users/{id}', [UserController::class, 'update'])->name('users.update');

@@ -1,6 +1,6 @@
 <div class="modal fade" id="modalTambahProduk" tabindex="-1" aria-labelledby="modalTambahProdukLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
+    <div class="modal-content border-0 shadow">
       <div class="modal-header">
         <h5 class="modal-title fw-bold" id="modalTambahProdukLabel"><i class="bi bi-box-seam me-2"></i>Tambah Produk Satuan Baru</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -18,10 +18,12 @@
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold" for="id_kategori">Kategori</label>
+              <!-- Menambahkan event listener change via JS -->
               <select class="form-select" id="id_kategori" name="id_kategori" required>
                 <option value="" selected disabled>-- Pilih Kategori --</option>
                 @foreach($kategoris as $kategori)
-                  <option value="{{ $kategori->id_kategori }}">{{ $kategori->nama_kategori }}</option>
+                  <!-- Ditambahkan data-nama untuk mempermudah deteksi teks di JavaScript -->
+                  <option value="{{ $kategori->id_kategori }}" data-nama="{{ $kategori->nama_kategori }}">{{ $kategori->nama_kategori }}</option>
                 @endforeach
               </select>
               <div class="invalid-feedback">Silakan pilih kategori produk.</div>
@@ -47,7 +49,6 @@
           </div>
 
           <hr>
-
           <div class="mb-3 d-flex justify-content-between align-items-center">
             <div>
               <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-tags me-2"></i>Manajemen Varian Ukuran & Stok</h6>
@@ -58,13 +59,19 @@
             </button>
           </div>
 
+          <!-- Alert Info Pre-Order Dinamis -->
+          <div id="alertPreOrderInfo" class="alert alert-info py-2 px-3 small border-0 mb-3 d-none">
+            <i class="bi bi-info-circle-fill me-1"></i> <strong>Sistem Pre-Order Aktif:</strong> Kategori Penugasan tidak memerlukan kuota fisik awal. Stok otomatis dikunci ke angka 0.
+          </div>
+
           <div id="wrapperVarian">
             <div class="row g-2 align-items-center mb-2 variant-row">
               <div class="col-4">
                 <input type="text" class="form-control form-control-sm" name="variants[0][nama_varian]" placeholder="Ukuran (S, M, L, All Size)" required>
               </div>
               <div class="col-3">
-                <input type="number" class="form-control form-control-sm" name="variants[0][stok]" placeholder="Kuota Stok" min="0" required>
+                <!-- Ditambahkan kelas js-input-stok untuk selektor massal -->
+                <input type="number" class="form-control form-control-sm js-input-stok" name="variants[0][stok]" placeholder="Kuota Stok" min="0" required>
               </div>
               <div class="col-4">
                 <input type="number" class="form-control form-control-sm" name="variants[0][harga_tambahan]" placeholder="+ Tambahan Harga (Rp)" value="0" min="0">
@@ -92,17 +99,76 @@
     let variantIndex = 1;
     const wrapper = document.getElementById('wrapperVarian');
     const btnTambah = document.getElementById('btnTambahVarian');
+    const selectKategori = document.getElementById('id_kategori');
+    const alertInfo = document.getElementById('alertPreOrderInfo');
 
-    // Handle Tambah Baris Varian
+    // Fungsi Pengunci Otomatis Fitur Varian & Stok
+    function sesuaikanKebijakanStok() {
+      const selectedOption = selectKategori.options[selectKategori.selectedIndex];
+      const namaKategori = selectedOption ? selectedOption.getAttribute('data-nama') : '';
+
+      const isPenugasan = (namaKategori === 'Penugasan');
+
+      if (isPenugasan) {
+        // 1. Tampilkan notifikasi sistem PO
+        alertInfo.classList.remove('d-none');
+
+        // 2. Sembunyikan tombol tambah baris agar tidak bisa input S, M, L
+        btnTambah.classList.add('d-none');
+
+        // 3. Bersihkan semua baris varian buatan admin, sisakan baris pertama saja
+        const rows = wrapper.querySelectorAll('.variant-row');
+        for (let i = 1; i < rows.length; i++) {
+          rows[i].remove();
+        }
+
+        // 4. Paksa baris pertama menjadi 'All Size' dengan kuota stok 0 (Locked)
+        const firstRow = rows[0];
+        const inputNamaVarian = firstRow.querySelector('input[name^="variants"][name$="[nama_varian]"]');
+        const inputStok = firstRow.querySelector('.js-input-stok');
+
+        inputNamaVarian.value = 'All Size';
+        inputNamaVarian.setAttribute('readonly', 'true');
+        inputNamaVarian.classList.add('bg-light');
+
+        inputStok.value = 0;
+        inputStok.setAttribute('readonly', 'true');
+        inputStok.classList.add('bg-light');
+
+      } else {
+        // Jika admin mengembalikan ke kategori Aksesoris / Atribut Fisik
+        alertInfo.classList.add('d-none');
+        btnTambah.classList.remove('d-none');
+
+        const rows = wrapper.querySelectorAll('.variant-row');
+        const firstRow = rows[0];
+        const inputNamaVarian = firstRow.querySelector('input[name^="variants"][name$="[nama_varian]"]');
+        const inputStok = firstRow.querySelector('.js-input-stok');
+
+        // Lepas gembok kunci agar bisa diisi manual kembali
+        inputNamaVarian.removeAttribute('readonly');
+        inputNamaVarian.classList.remove('bg-light');
+        if (inputNamaVarian.value === 'All Size') inputNamaVarian.value = '';
+
+        inputStok.removeAttribute('readonly');
+        inputStok.classList.remove('bg-light');
+        if (inputStok.value === '0') inputStok.value = '';
+      }
+    }
+
+    // Jalankan pengecekan setiap admin mengubah kategori produk
+    selectKategori.addEventListener('change', sesuaikanKebijakanStok);
+
+    // Handle Tambah Baris Varian (Hanya aktif di luar kategori Penugasan)
     btnTambah.addEventListener('click', function () {
       const row = document.createElement('div');
       row.className = 'row g-2 align-items-center mb-2 variant-row';
       row.innerHTML = `
         <div class="col-4">
-          <input type="text" class="form-control form-control-sm" name="variants[${variantIndex}][nama_varian]" placeholder="Ukuran (S, M, L, All Size)" required>
+          <input type="text" class="form-control form-control-sm" name="variants[${variantIndex}][nama_varian]" placeholder="Ukuran (S, M, L)" required>
         </div>
         <div class="col-3">
-          <input type="number" class="form-control form-control-sm" name="variants[${variantIndex}][stok]" placeholder="Kuota Stok" min="0" required>
+          <input type="number" class="form-control form-control-sm js-input-stok" name="variants[${variantIndex}][stok]" placeholder="Kuota Stok" min="0" required>
         </div>
         <div class="col-4">
           <input type="number" class="form-control form-control-sm" name="variants[${variantIndex}][harga_tambahan]" placeholder="+ Tambahan Harga (Rp)" value="0" min="0">
